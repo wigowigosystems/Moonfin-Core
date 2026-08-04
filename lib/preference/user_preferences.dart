@@ -6,6 +6,7 @@ import 'package:jellyfin_preference/jellyfin_preference.dart';
 import 'package:server_core/server_core.dart' hide ImageType;
 
 import '../data/models/aggregated_item.dart';
+import '../data/models/series_track_preference.dart';
 import '../playback/audio_capability_profile.dart';
 import '../util/idiom/app_ui_idiom.dart';
 import '../util/insecure_certificates.dart';
@@ -260,11 +261,18 @@ class UserPreferences extends ChangeNotifier {
     'imdb_top_250_tv_shows_enabled',
     'imdb_top_english_movies_enabled',
     'live_tv_channel_sort_by',
+    'music_playback_time_display',
     'osdButtonOrderDesktop',
     'osdButtonOrderMobile',
     'osdButtonOrderTv',
     'osdLockEnabled',
     'pgs_enabled',
+    'playback_time_above_center',
+    'playback_time_above_left',
+    'playback_time_above_right',
+    'playback_time_below_center',
+    'playback_time_below_left',
+    'playback_time_below_right',
     'player_zoom_mode',
     'pref_audio_rows_sort_by',
     'pref_diagnostic_logging_enabled',
@@ -276,6 +284,7 @@ class UserPreferences extends ChangeNotifier {
     'pref_live_direct',
     'pref_max_bitrate',
     'pref_max_video_resolution',
+    'pref_playlists_row_show_episodes',
     'pref_playlists_row_sort_by',
     'pref_recommendations_apply_parental_rating_cap',
     'pref_resume_last_queue_on_play',
@@ -384,6 +393,7 @@ class UserPreferences extends ChangeNotifier {
     'pref_display_collections_rows',
     'pref_display_genres_rows',
     'pref_favorites_row_sort_by',
+    'pref_collections_row_show_episodes',
     'pref_collections_row_sort_by',
     'pref_genres_row_sort_by',
     'pref_genres_row_item_filter',
@@ -397,6 +407,7 @@ class UserPreferences extends ChangeNotifier {
     'pref_merge_continue_watching_next_up',
     'pref_next_up_max_days',
     'enable_multi_server_libraries',
+    'pref_merge_recent_rows_by_type',
     'enable_folder_view',
     'seasonal_surprise',
     'mediaBarEnabled',
@@ -1073,8 +1084,13 @@ class UserPreferences extends ChangeNotifier {
 
   static final collectionsRowSortBy = EnumPreference(
     key: 'pref_collections_row_sort_by',
-    defaultValue: LibrarySortBy.name,
+    defaultValue: LibrarySortBy.playlistOrder,
     values: LibrarySortBy.values,
+  );
+
+  static final collectionsRowShowEpisodes = Preference(
+    key: 'pref_collections_row_show_episodes',
+    defaultValue: false,
   );
 
   static final genresRowSortBy = EnumPreference(
@@ -1085,8 +1101,13 @@ class UserPreferences extends ChangeNotifier {
 
   static final playlistsRowSortBy = EnumPreference(
     key: 'pref_playlists_row_sort_by',
-    defaultValue: LibrarySortBy.name,
+    defaultValue: LibrarySortBy.playlistOrder,
     values: LibrarySortBy.values,
+  );
+
+  static final playlistsRowShowEpisodes = Preference(
+    key: 'pref_playlists_row_show_episodes',
+    defaultValue: false,
   );
 
   static final audioRowsSortBy = EnumPreference(
@@ -1290,6 +1311,10 @@ class UserPreferences extends ChangeNotifier {
     key: 'enable_multi_server_libraries',
     defaultValue: false,
   );
+  static final mergeRecentRowsByType = Preference(
+    key: 'pref_merge_recent_rows_by_type',
+    defaultValue: false,
+  );
 
   static final diagnosticLoggingEnabled = Preference(
     key: 'pref_diagnostic_logging_enabled',
@@ -1478,6 +1503,51 @@ class UserPreferences extends ChangeNotifier {
   static final trickPlayEnabled = Preference(
     key: 'trick_play_enabled',
     defaultValue: false,
+  );
+
+  // Defaults chosen so the overlay looks unchanged for anyone who never opens
+  // the setting.
+  static final playbackTimeAboveLeft = EnumPreference(
+    key: 'playback_time_above_left',
+    defaultValue: PlaybackTimeSlot.none,
+    values: PlaybackTimeSlot.values,
+  );
+
+  static final playbackTimeAboveCenter = EnumPreference(
+    key: 'playback_time_above_center',
+    defaultValue: PlaybackTimeSlot.none,
+    values: PlaybackTimeSlot.values,
+  );
+
+  static final playbackTimeAboveRight = EnumPreference(
+    key: 'playback_time_above_right',
+    defaultValue: PlaybackTimeSlot.endsAt,
+    values: PlaybackTimeSlot.values,
+  );
+
+  static final playbackTimeBelowLeft = EnumPreference(
+    key: 'playback_time_below_left',
+    defaultValue: PlaybackTimeSlot.elapsed,
+    values: PlaybackTimeSlot.values,
+  );
+
+  static final playbackTimeBelowCenter = EnumPreference(
+    key: 'playback_time_below_center',
+    defaultValue: PlaybackTimeSlot.none,
+    values: PlaybackTimeSlot.values,
+  );
+
+  static final playbackTimeBelowRight = EnumPreference(
+    key: 'playback_time_below_right',
+    defaultValue: PlaybackTimeSlot.totalDuration,
+    values: PlaybackTimeSlot.values,
+  );
+
+  /// The music player has one label rather than six slots, so it picks a mode.
+  static final musicPlaybackTimeDisplay = EnumPreference(
+    key: 'music_playback_time_display',
+    defaultValue: PlaybackTimeDisplay.totalDuration,
+    values: PlaybackTimeDisplay.values,
   );
 
   static final pgsDirectPlay = Preference(
@@ -2507,20 +2577,39 @@ class UserPreferences extends ChangeNotifier {
     defaultValue: false,
   );
 
-  String getSeriesSubtitleLanguage(String seriesId) {
+  SeriesTrackPreference getSeriesSubtitlePreference(String seriesId) {
     final pref = Preference(
       key: 'pref_series_subtitle_lang_$seriesId',
       defaultValue: '',
     );
-    return _store.get(pref);
+    final raw = _store.get(pref);
+    return SeriesTrackPreference.fromRawString(raw);
   }
 
-  Future<void> setSeriesSubtitleLanguage(String seriesId, String language) async {
-    final pref = Preference(
+  Future<void> setSeriesSubtitlePreference(String seriesId, SeriesTrackPreference pref) async {
+    final key = Preference(
       key: 'pref_series_subtitle_lang_$seriesId',
       defaultValue: '',
     );
-    await _store.set(pref, language);
+    await _store.set(key, pref.toRawString());
+    notifyListeners();
+  }
+
+  SeriesTrackPreference getSeriesAudioPreference(String seriesId) {
+    final pref = Preference(
+      key: 'pref_series_audio_lang_$seriesId',
+      defaultValue: '',
+    );
+    final raw = _store.get(pref);
+    return SeriesTrackPreference.fromRawString(raw);
+  }
+
+  Future<void> setSeriesAudioPreference(String seriesId, SeriesTrackPreference pref) async {
+    final key = Preference(
+      key: 'pref_series_audio_lang_$seriesId',
+      defaultValue: '',
+    );
+    await _store.set(key, pref.toRawString());
     notifyListeners();
   }
 

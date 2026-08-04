@@ -69,6 +69,12 @@ class PlaybackManager implements AudioOwnable {
   Duration _lastKnownPosition = Duration.zero;
   Duration _itemKnownDuration = Duration.zero;
   int? _maxBitrateOverrideMbps;
+
+  /// Host supplied measurement of the link to the active server, in bits per
+  /// second. Consulted when nothing else caps the stream, so Auto means a
+  /// measured ceiling rather than no ceiling. Null answers keep the request
+  /// uncapped.
+  Future<int?> Function()? autoBitrateProvider;
   DateTime? _playbackStartTime;
   bool _waitingForMedia = false;
   SubtitleRendererMode _subtitleRendererMode = SubtitleRendererMode.native;
@@ -122,6 +128,13 @@ class PlaybackManager implements AudioOwnable {
 
   void Function(String itemId, int? subtitleStreamIndex)? onSubtitleTrackChanged;
   void Function(String itemId, int? audioStreamIndex)? onAudioTrackChanged;
+
+  /// Fired only when the viewer picks a track, unlike the changed callbacks
+  /// above which also report the automatic pick for a new item and the reset
+  /// when one finishes. The index arrives raw, so -1 still reads as subtitles
+  /// off rather than as no choice at all.
+  void Function(String itemId, int subtitleStreamIndex)? onSubtitleTrackSelected;
+  void Function(String itemId, int audioStreamIndex)? onAudioTrackSelected;
 
   Stream<PlaybackBringupState> get bringupStateStream =>
       _bringupStateController.stream;
@@ -1117,7 +1130,15 @@ class PlaybackManager implements AudioOwnable {
     if (_maxBitrateOverrideMbps != null) {
       profile['MaxStreamingBitrate'] = _maxBitrateOverrideMbps! * 1000000;
     }
-    final maxBitrate = profile['MaxStreamingBitrate'] as int?;
+    var maxBitrate = profile['MaxStreamingBitrate'] as int?;
+    if (maxBitrate == null && autoBitrateProvider != null) {
+      final measured = await autoBitrateProvider!();
+      if (sessionToken != _playbackSessionToken) return;
+      if (measured != null && measured > 0) {
+        maxBitrate = measured;
+        profile['MaxStreamingBitrate'] = measured;
+      }
+    }
 
     final resolution = await _resolver!.resolve(
       item,
@@ -1559,7 +1580,7 @@ class PlaybackManager implements AudioOwnable {
         final isBurnedIn =
             (_isSubtitleBitmap(_subtitleStreamIndex!) &&
              !(_backend?.canRenderBitmapSubtitles ?? false)) ||
-            resolution.streamUrl.toLowerCase().contains('subtitlemethod=encode');
+            _isSubtitleBurnedIn(_subtitleStreamIndex);
         if (isBurnedIn) {
           _waitAndDisableSubtitles(sessionToken, force: true);
         } else if (_subtitleRendererModeForStream(_subtitleStreamIndex!) ==
@@ -1770,7 +1791,10 @@ class PlaybackManager implements AudioOwnable {
     }
   }
 
-  Future<void> changeAudioTrack(int streamIndex) => _withProgressPaused(() async {
+  Future<void> changeAudioTrack(
+    int streamIndex, {
+    bool userInitiated = true,
+  }) => _withProgressPaused(() async {
     _audioStreamIndex = streamIndex;
     _audioSelectionExplicit = true;
 
@@ -1778,6 +1802,7 @@ class PlaybackManager implements AudioOwnable {
     if (currentItem != null) {
       final itemId = MediaStreamResolver.extractItemId(currentItem);
       onAudioTrackChanged?.call(itemId, streamIndex >= 0 ? streamIndex : null);
+      if (userInitiated) onAudioTrackSelected?.call(itemId, streamIndex);
     }
 
     final streams = _currentMediaStreams;
@@ -1828,6 +1853,32 @@ class PlaybackManager implements AudioOwnable {
         );
     final codec = ((sub['Codec'] as String?) ?? '').toLowerCase();
     return _bitmapSubCodecs.contains(codec);
+  }
+
+  /// Whether the server is painting [streamIndex] into the video itself.
+  ///
+  /// Not every server says so in the stream URL, so the delivery method the
+  /// media source reports is asked as well. Missing it leaves the client
+  /// drawing its own copy over the one already in the picture. Only a
+  /// transcode can burn anything in, so that second answer is not worth
+  /// reading on any other play method, where a stream can carry a delivery
+  /// method describing what a transcode would have done.
+  bool _isSubtitleBurnedIn(int? streamIndex) {
+    if (streamIndex != null &&
+        streamIndex >= 0 &&
+        _currentResolution?.playMethod == StreamPlayMethod.transcode) {
+      for (final s in _currentMediaStreams) {
+        if (s['Type'] != 'Subtitle') continue;
+        if (s['Index'] != streamIndex) continue;
+        final method = (s['DeliveryMethod'] as String?)?.trim().toLowerCase();
+        if (method == 'encode') return true;
+        break;
+      }
+    }
+    return _currentResolution?.streamUrl.toLowerCase().contains(
+          'subtitlemethod=encode',
+        ) ??
+        false;
   }
 
   bool _isSubtitleExternal(int streamIndex) {
@@ -1953,10 +2004,19 @@ class PlaybackManager implements AudioOwnable {
     _subtitleRendererMode = SubtitleRendererMode.native;
   }
 
-  Future<void> changeSubtitleTrack(int streamIndex) =>
-      _withProgressPaused(() => _changeSubtitleTrackInner(streamIndex));
+  /// Pass `userInitiated: false` when reapplying the track already playing, so
+  /// it isn't mistaken for the viewer choosing it.
+  Future<void> changeSubtitleTrack(
+    int streamIndex, {
+    bool userInitiated = true,
+  }) => _withProgressPaused(
+    () => _changeSubtitleTrackInner(streamIndex, userInitiated: userInitiated),
+  );
 
-  Future<void> _changeSubtitleTrackInner(int streamIndex) async {
+  Future<void> _changeSubtitleTrackInner(
+    int streamIndex, {
+    bool userInitiated = true,
+  }) async {
     final previousSubtitleStreamIndex = _subtitleStreamIndex;
     final isBitmap = _isSubtitleBitmap(streamIndex);
     _subtitleStreamIndex = streamIndex;
@@ -1965,6 +2025,7 @@ class PlaybackManager implements AudioOwnable {
     if (currentItem != null) {
       final itemId = MediaStreamResolver.extractItemId(currentItem);
       onSubtitleTrackChanged?.call(itemId, streamIndex >= 0 ? streamIndex : null);
+      if (userInitiated) onSubtitleTrackSelected?.call(itemId, streamIndex);
     }
 
     _subtitleSelectionExplicit = streamIndex >= 0;
@@ -2028,7 +2089,7 @@ class PlaybackManager implements AudioOwnable {
            previousSubtitleStreamIndex >= 0 &&
            _isSubtitleBitmap(previousSubtitleStreamIndex) &&
            !(_backend?.canRenderBitmapSubtitles ?? false)) ||
-          (_currentResolution?.streamUrl.toLowerCase().contains('subtitlemethod=encode') ?? false);
+          _isSubtitleBurnedIn(previousSubtitleStreamIndex);
       if (previousWasBurned && !isBitmap) {
         await _backend?.disableSubtitleTrack();
         await _reResolveAtCurrentPosition();
@@ -2064,11 +2125,19 @@ class PlaybackManager implements AudioOwnable {
   }
 
   Future<void> disableSubtitles() => _withProgressPaused(() async {
-    final previousWasBurned =
-        _currentResolution?.streamUrl.toLowerCase().contains('subtitlemethod=encode') ?? false;
+    final previousWasBurned = _isSubtitleBurnedIn(_subtitleStreamIndex);
     _subtitleStreamIndex = -1;
     _lastExplicitSubtitleEnabled = false;
     _lastExplicitSubtitleLanguage = null;
+
+    final currentItem = queueService.currentItem;
+    if (currentItem != null) {
+      onSubtitleTrackSelected?.call(
+        MediaStreamResolver.extractItemId(currentItem),
+        -1,
+      );
+    }
+
     await _resetSubtitleRendererMode();
     if (previousWasBurned || (!_isOfflinePlayback &&
         !(_backend?.supportsRuntimeTrackSelection ?? true))) {
@@ -2185,7 +2254,7 @@ class PlaybackManager implements AudioOwnable {
         if (sessionToken != _playbackSessionToken) return;
       }
     }
-    final isBurnedIn = _currentResolution?.streamUrl.toLowerCase().contains('subtitlemethod=encode') ?? false;
+    final isBurnedIn = _isSubtitleBurnedIn(_subtitleStreamIndex);
     if (isBurnedIn) {
       await _resetSubtitleRendererMode();
       await _backend?.disableSubtitleTrack();
