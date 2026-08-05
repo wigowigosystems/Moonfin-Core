@@ -2552,21 +2552,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'DTS sesi yalnızca AVR\'ye bitstream olarak aktar; alıcı desteği ve DTS kaynak izi gerektirir';
 
   @override
-  String get enableTrueHdAudio =>
-      'TrueHD sesi etkinleştir (tüm platformlarda çalışmayabilir)';
-
-  @override
-  String get settingsAudioOutputMode => 'Ses Çıkış Modu';
-
-  @override
-  String get settingsAudioOutputModeDescription =>
-      'Ses çözme yöntemini seçin. AVR Doğrudan Geçiş (Passthrough), ham Dolby/DTS akışlarını alıcınıza gönderir; Otomatik veya Downmix ise sesi cihazınızda çözer.';
-
-  @override
-  String get settingsAudioOutputModeAvrPassthrough =>
-      'AVR Doğrudan Geçiş (Passthrough)';
-
-  @override
   String get settingsAudioFallbackCodec => 'Yedek Ses Kodeki';
 
   @override
@@ -2584,9 +2569,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get settingsAudioFallbackCodecEac3 => 'EAC3\n(Dolby Digital Plus)';
-
-  @override
-  String get settingsAudioFallbackCodecTrueHd => 'TrueHD\n(Kayıpsız)';
 
   @override
   String get settingsAudioFallbackCodecMp3 => 'MP3\n(Sadece Stereo)';
@@ -2649,10 +2631,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'EAC3 Doğrudan Geçiş (Passthrough)';
 
   @override
-  String get settingsAudioEac3JocPassthrough =>
-      'EAC3 JOC (Atmos) Doğrudan Geçiş (Passthrough)';
-
-  @override
   String get settingsAudioDtsCorePassthrough =>
       'DTS Core Doğrudan Geçiş (Passthrough)';
 
@@ -2661,31 +2639,53 @@ class AppLocalizationsTr extends AppLocalizations {
       'DTS-HD MA Doğrudan Geçiş (Passthrough)';
 
   @override
+  String get settingsAudioPassthroughMode => 'Passthrough';
+
+  @override
+  String get settingsAudioPassthroughModeDescription =>
+      'How compressed surround sound reaches your TV or receiver.';
+
+  @override
+  String get settingsAudioPassthroughModeDisabled =>
+      'Disabled (always decode on this device)';
+
+  @override
+  String get settingsAudioPassthroughModeAuto =>
+      'Auto (match detected device support)';
+
+  @override
+  String get settingsAudioPassthroughModeManual =>
+      'Manual (choose formats below)';
+
+  @override
+  String get settingsDownmixToStereoDescription =>
+      'Mix all decoded audio down to two channels.';
+
+  @override
+  String get settingsAudioEac3IncludesAtmos =>
+      'Bitstream E-AC-3, including Dolby Atmos (JOC).';
+
+  @override
+  String get settingsAudioDtsHdIncludesDtsX =>
+      'Bitstream DTS-HD, including DTS:X.';
+
+  @override
+  String get settingsAudioTrueHdIncludesAtmos =>
+      'Bitstream TrueHD, including Dolby Atmos.';
+
+  @override
   String get settingsAudioTrueHdPassthrough =>
       'TrueHD Doğrudan Geçiş (Passthrough)';
 
   @override
-  String get settingsAudioTrueHdAtmosPassthrough =>
-      'TrueHD Atmos Doğrudan Geçiş (Passthrough)';
-
-  @override
-  String get settingsAudioBitstreamEac3ToExternalDecoder =>
-      'Dolby Digital Plus (EAC3) ses akışını harici dekodere ilet.';
-
-  @override
-  String get settingsAudioBitstreamEac3JocToExternalDecoder =>
-      'EAC3 (JOC) üzerinden Dolby Atmos ses akışını harici dekodere ilet.';
-
-  @override
-  String get settingsAudioBitstreamDtsHdToExternalDecoder =>
-      'DTS çekirdeğini içeren DTS-HD MA ses akışını harici dekodere ilet.';
-
-  @override
-  String get settingsAudioBitstreamTrueHdAtmosToExternalDecoder =>
-      'Atmos meta verileri içeren Dolby TrueHD ses akışını harici dekodere ilet.';
-
-  @override
   String get settingsDetectedAudioCapabilities => 'Algılanan Ses Özellikleri';
+
+  @override
+  String get settingsShowAudioDecoderBanner => 'Show audio decoder';
+
+  @override
+  String get settingsShowAudioDecoderBannerDescription =>
+      'Briefly name the decoder handling the audio when playback starts.';
 
   @override
   String get settingsDetectedAudioCapabilitiesUnavailable =>
@@ -9262,18 +9262,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get notSupportedOnThisDevice => 'Bu cihazda desteklenmiyor';
-
-  @override
-  String get settingsAudioDtsXPassthrough =>
-      'DTS:X (DTS UHD) Doğrudan Geçiş (Passthrough)';
-
-  @override
-  String get settingsAudioBitstreamDtsXToExternalDecoder =>
-      'DTS:X (DTS UHD) sesini harici kod çözücüye bitstream olarak aktar.';
-
-  @override
-  String get settingsAudioTrueHdJocPassthrough =>
-      'TrueHD with Atmos (JOC) Doğrudan Geçiş (Passthrough)';
 
   @override
   String get mediaPlayerBehavior => 'Medya Oynatıcı Davranışı';

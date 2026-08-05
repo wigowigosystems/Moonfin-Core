@@ -2566,21 +2566,6 @@ class AppLocalizationsLt extends AppLocalizations {
       'DTS garso bitų srautas tik į AVR; reikalingas imtuvo palaikymas ir DTS šaltinio takelis';
 
   @override
-  String get enableTrueHdAudio =>
-      'Įgalinti „TrueHD“ garsą (gali veikti ne visose platformose)';
-
-  @override
-  String get settingsAudioOutputMode => 'Garso išvesties režimas';
-
-  @override
-  String get settingsAudioOutputModeDescription =>
-      'Pasirinkite, kaip dekoduojamas garsas. „AVR tiesioginis perdavimas“ siunčia neapdorotus Dolby / DTS srautus į imtuvą; „Automatinis“ arba „Sumaišymas“ dekoduoja vietoje.';
-
-  @override
-  String get settingsAudioOutputModeAvrPassthrough =>
-      'AVR tiesioginis perdavimas';
-
-  @override
   String get settingsAudioFallbackCodec => 'Atsarginis garso kodekas';
 
   @override
@@ -2599,9 +2584,6 @@ class AppLocalizationsLt extends AppLocalizations {
 
   @override
   String get settingsAudioFallbackCodecEac3 => 'EAC3\n(Dolby Digital Plus)';
-
-  @override
-  String get settingsAudioFallbackCodecTrueHd => 'TrueHD\n(be nuostolių)';
 
   @override
   String get settingsAudioFallbackCodecMp3 => 'MP3\n(tik stereo)';
@@ -2662,10 +2644,6 @@ class AppLocalizationsLt extends AppLocalizations {
   String get settingsAudioEac3Passthrough => 'EAC3 tiesioginis perdavimas';
 
   @override
-  String get settingsAudioEac3JocPassthrough =>
-      'EAC3 JOC (Atmos) tiesioginis perdavimas';
-
-  @override
   String get settingsAudioDtsCorePassthrough =>
       'DTS Core tiesioginis perdavimas';
 
@@ -2674,30 +2652,52 @@ class AppLocalizationsLt extends AppLocalizations {
       'DTS-HD MA tiesioginis perdavimas';
 
   @override
+  String get settingsAudioPassthroughMode => 'Passthrough';
+
+  @override
+  String get settingsAudioPassthroughModeDescription =>
+      'How compressed surround sound reaches your TV or receiver.';
+
+  @override
+  String get settingsAudioPassthroughModeDisabled =>
+      'Disabled (always decode on this device)';
+
+  @override
+  String get settingsAudioPassthroughModeAuto =>
+      'Auto (match detected device support)';
+
+  @override
+  String get settingsAudioPassthroughModeManual =>
+      'Manual (choose formats below)';
+
+  @override
+  String get settingsDownmixToStereoDescription =>
+      'Mix all decoded audio down to two channels.';
+
+  @override
+  String get settingsAudioEac3IncludesAtmos =>
+      'Bitstream E-AC-3, including Dolby Atmos (JOC).';
+
+  @override
+  String get settingsAudioDtsHdIncludesDtsX =>
+      'Bitstream DTS-HD, including DTS:X.';
+
+  @override
+  String get settingsAudioTrueHdIncludesAtmos =>
+      'Bitstream TrueHD, including Dolby Atmos.';
+
+  @override
   String get settingsAudioTrueHdPassthrough => 'TrueHD tiesioginis perdavimas';
 
   @override
-  String get settingsAudioTrueHdAtmosPassthrough =>
-      'TrueHD Atmos tiesioginis perdavimas';
-
-  @override
-  String get settingsAudioBitstreamEac3ToExternalDecoder =>
-      'Perduoti Dolby Digital Plus (EAC3) bitų srautą į išorinį dekoderį.';
-
-  @override
-  String get settingsAudioBitstreamEac3JocToExternalDecoder =>
-      'Perduoti Dolby Atmos per EAC3 (JOC) bitų srautą į išorinį dekoderį.';
-
-  @override
-  String get settingsAudioBitstreamDtsHdToExternalDecoder =>
-      'Perduoti DTS-HD MA (įskaitant DTS Core) bitų srautą į išorinį dekoderį.';
-
-  @override
-  String get settingsAudioBitstreamTrueHdAtmosToExternalDecoder =>
-      'Perduoti Dolby TrueHD su Atmos metaduomenimis bitų srautą į išorinį dekoderį.';
-
-  @override
   String get settingsDetectedAudioCapabilities => 'Aptiktos garso galimybės';
+
+  @override
+  String get settingsShowAudioDecoderBanner => 'Show audio decoder';
+
+  @override
+  String get settingsShowAudioDecoderBannerDescription =>
+      'Briefly name the decoder handling the audio when playback starts.';
 
   @override
   String get settingsDetectedAudioCapabilitiesUnavailable =>
@@ -9310,17 +9310,6 @@ class AppLocalizationsLt extends AppLocalizations {
 
   @override
   String get notSupportedOnThisDevice => 'Nepalaikomas šiame įrenginyje';
-
-  @override
-  String get settingsAudioDtsXPassthrough => 'DTS:X (DTS UHD) pralaidumas';
-
-  @override
-  String get settingsAudioBitstreamDtsXToExternalDecoder =>
-      'Bitų srautas DTS:X (DTS UHD) į išorinį dekoderį.';
-
-  @override
-  String get settingsAudioTrueHdJocPassthrough =>
-      '„TrueHD“ su „Atmos“ (JOC) pralaidumu';
 
   @override
   String get mediaPlayerBehavior => 'Media Player elgesys';

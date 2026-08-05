@@ -94,31 +94,6 @@ bool _isEpisodeQueueItem(AggregatedItem item) {
   return type == 'episode';
 }
 
-List<String> _passthroughCodecsForDiagnostics(UserPreferences prefs) {
-  if (prefs.resolveAudioOutputMode() == AudioOutputMode.forceStereo) {
-    return const <String>[];
-  }
-
-  final codecs = <String>[];
-  if (prefs.resolveAc3PassthroughEnabled()) {
-    codecs.add('ac3');
-  }
-  if (prefs.resolveEac3PassthroughEnabled() ||
-      prefs.resolveEac3JocPassthroughEnabled()) {
-    codecs.add('eac3');
-  }
-  if (prefs.resolveDtsHdPassthroughEnabled()) {
-    codecs.add('dts-hd');
-  } else if (prefs.resolveDtsCorePassthroughEnabled()) {
-    codecs.add('dts');
-  }
-  if (prefs.resolveTrueHdPassthroughEnabled() ||
-      prefs.resolveTrueHdAtmosPassthroughEnabled()) {
-    codecs.add('truehd');
-  }
-  return codecs;
-}
-
 MediaServerClient? _resolveClientForServerId(String serverId) {
   final factory = _getIt<MediaServerClientFactory>();
   final direct = factory.getClientIfExists(serverId);
@@ -391,12 +366,12 @@ void registerPlaybackModule() {
   final PlayerBackend initialBackend = PlatformDetection.isTizen
       ? tizenBackend!
       : PlatformDetection.isAppleTV
-          ? appleTvBackend!
-          : (PlatformDetection.isIOS || PlatformDetection.isMacOS)
-              ? iosBackend!
-              : PlatformDetection.isWeb
-                  ? (htmlBackend ?? backend!)
-                  : (useMedia3ByDefault ? media3Backend! : backend!);
+      ? appleTvBackend!
+      : (PlatformDetection.isIOS || PlatformDetection.isMacOS)
+      ? iosBackend!
+      : PlatformDetection.isWeb
+      ? (htmlBackend ?? backend!)
+      : (useMedia3ByDefault ? media3Backend! : backend!);
   _getIt.registerSingleton<PlayerBackend>(initialBackend);
 
   final manager = PlaybackManager();
@@ -545,7 +520,10 @@ void registerPlaybackModule() {
     final audioCapabilityProfile = prefs.detectedAudioCapabilities;
 
     final audioSpdifCodecs = context.backend is MediaKitPlayerBackend
-        ? _passthroughCodecsForDiagnostics(prefs)
+        ? MediaKitPlayerBackend.passthroughCodecsFromSet(
+            prefs.resolvedPassthroughCodecs(),
+            downmixToStereo: prefs.get(UserPreferences.downmixToStereo),
+          )
         : const <String>[];
 
     PlaybackProfileDiagnostics.instance.logPlaybackDecision(
@@ -558,10 +536,13 @@ void registerPlaybackModule() {
       // Preference state behind the channel math, so a report showing an
       // unexpected stereo cap is attributable without a settings screenshot.
       audioPreferenceContext: <String, dynamic>{
-        'audioOutputMode': prefs.resolveAudioOutputMode().name,
+        'passthroughMode': prefs.get(UserPreferences.audioPassthroughMode).name,
+        'passthroughCodecs': prefs
+            .resolvedPassthroughCodecs()
+            .map((codec) => codec.wireName)
+            .toList(growable: false),
+        'downmixToStereo': prefs.get(UserPreferences.downmixToStereo),
         'prefMaxAudioChannels': prefs.resolveMaxAudioChannels(),
-        'audioPassthroughPreset':
-            prefs.get(UserPreferences.audioPassthroughPreset).name,
         if (Media3PlayerBackend.ffmpegDecoderDiagnostics != null)
           'ffmpegDecoder': Media3PlayerBackend.ffmpegDecoderDiagnostics,
       },
@@ -597,7 +578,9 @@ void registerPlaybackModule() {
     if (currentItem is AggregatedItem &&
         currentItem.seriesId != null &&
         currentItem.seriesId!.isNotEmpty) {
-      final seriesAudioPref = prefs.getSeriesAudioPreference(currentItem.seriesId!);
+      final seriesAudioPref = prefs.getSeriesAudioPreference(
+        currentItem.seriesId!,
+      );
       if (seriesAudioPref.isNotEmpty) {
         final matchedIndex = matchSeriesTrackIndex(
           streams: audioStreams,
@@ -607,22 +590,27 @@ void registerPlaybackModule() {
       }
     }
 
-    final preferredAudioLanguage = manager.lastExplicitAudioLanguage ??
+    final preferredAudioLanguage =
+        manager.lastExplicitAudioLanguage ??
         (prefs.get(UserPreferences.defaultAudioLanguage) as String? ?? 'auto');
 
     return computeEffectiveAudioIndex(
       audioStreams: audioStreams,
       preferredAudioLanguage: preferredAudioLanguage,
-      fallbackAudioLanguage: prefs.get(UserPreferences.fallbackAudioLanguage) as String? ?? '',
-      preferDefaultAudioTrack: prefs.get(UserPreferences.preferDefaultAudioTrack) as bool? ?? false,
-      preferAudioDescription: prefs.get(UserPreferences.preferAudioDescription) as bool? ?? false,
+      fallbackAudioLanguage:
+          prefs.get(UserPreferences.fallbackAudioLanguage) as String? ?? '',
+      preferDefaultAudioTrack:
+          prefs.get(UserPreferences.preferDefaultAudioTrack) as bool? ?? false,
+      preferAudioDescription:
+          prefs.get(UserPreferences.preferAudioDescription) as bool? ?? false,
       explicitAudioIndex: explicitIndex,
       lastExplicitAudioIndex: manager.lastExplicitAudioIndex,
       lastExplicitAudioTitle: manager.lastExplicitAudioTitle,
     );
   };
 
-  manager.subtitleTrackSelector = (subtitleStreams, audioStreams, explicitIndex) {
+  manager
+      .subtitleTrackSelector = (subtitleStreams, audioStreams, explicitIndex) {
     if (explicitIndex != null) return explicitIndex;
 
     final currentItem = manager.queueService.currentItem;
@@ -645,12 +633,19 @@ void registerPlaybackModule() {
 
     final effectiveAudioIndex = computeEffectiveAudioIndex(
       audioStreams: audioStreams,
-      preferredAudioLanguage: manager.lastExplicitAudioLanguage ??
-          (prefs.get(UserPreferences.defaultAudioLanguage) as String? ?? 'auto'),
-      fallbackAudioLanguage: prefs.get(UserPreferences.fallbackAudioLanguage) as String? ?? '',
-      preferDefaultAudioTrack: prefs.get(UserPreferences.preferDefaultAudioTrack) as bool? ?? false,
-      preferAudioDescription: prefs.get(UserPreferences.preferAudioDescription) as bool? ?? false,
-      explicitAudioIndex: manager.audioSelectionExplicit ? manager.audioStreamIndex : null,
+      preferredAudioLanguage:
+          manager.lastExplicitAudioLanguage ??
+          (prefs.get(UserPreferences.defaultAudioLanguage) as String? ??
+              'auto'),
+      fallbackAudioLanguage:
+          prefs.get(UserPreferences.fallbackAudioLanguage) as String? ?? '',
+      preferDefaultAudioTrack:
+          prefs.get(UserPreferences.preferDefaultAudioTrack) as bool? ?? false,
+      preferAudioDescription:
+          prefs.get(UserPreferences.preferAudioDescription) as bool? ?? false,
+      explicitAudioIndex: manager.audioSelectionExplicit
+          ? manager.audioStreamIndex
+          : null,
       lastExplicitAudioIndex: manager.lastExplicitAudioIndex,
       lastExplicitAudioTitle: manager.lastExplicitAudioTitle,
     );
@@ -659,7 +654,9 @@ void registerPlaybackModule() {
       (s) => s['Index'] == effectiveAudioIndex,
       orElse: () => const <String, dynamic>{},
     );
-    final activeAudioLanguage = activeAudioStream.isNotEmpty ? activeAudioStream['Language'] as String? : null;
+    final activeAudioLanguage = activeAudioStream.isNotEmpty
+        ? activeAudioStream['Language'] as String?
+        : null;
 
     var subtitleMode = manager.lastExplicitSubtitleEnabled == false
         ? SubtitleMode.none
@@ -685,11 +682,14 @@ void registerPlaybackModule() {
       activePlaybackSubtitleIndex: null,
       subtitleMode: subtitleMode,
       preferredLanguage: preferredLanguage,
-      fallbackLanguage: prefs.get(UserPreferences.fallbackSubtitleLanguage) as String? ?? '',
-      preferSdh: prefs.get(UserPreferences.preferSdhSubtitles) as bool? ?? false,
+      fallbackLanguage:
+          prefs.get(UserPreferences.fallbackSubtitleLanguage) as String? ?? '',
+      preferSdh:
+          prefs.get(UserPreferences.preferSdhSubtitles) as bool? ?? false,
       pgsDirectPlay: prefs.get(UserPreferences.pgsDirectPlay) as bool? ?? false,
       assDirectPlay: prefs.get(UserPreferences.assDirectPlay) as bool? ?? false,
-      preferredAudioLanguage: prefs.get(UserPreferences.defaultAudioLanguage) as String? ?? 'auto',
+      preferredAudioLanguage:
+          prefs.get(UserPreferences.defaultAudioLanguage) as String? ?? 'auto',
       activeAudioLanguage: activeAudioLanguage,
     );
   };
@@ -804,4 +804,3 @@ Future<void> _ensureResolverForItem(dynamic item) async {
   if (client == null) return;
   setActiveStreamResolver(client);
 }
-
